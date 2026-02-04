@@ -17,7 +17,10 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
-    // Prevent duplicate React instances (fixes "Component is not a function")
+    // Prevent duplicate React instances (fixes hooks errors)
     dedupe: ["react", "react-dom", "react/jsx-runtime"],
+  },
+  optimizeDeps: {
+    include: ["react", "react-dom"],
   },
 }));
