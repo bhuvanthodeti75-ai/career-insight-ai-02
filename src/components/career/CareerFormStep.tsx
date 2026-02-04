@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { forwardRef, ReactNode } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
@@ -10,27 +10,25 @@ interface CareerFormStepProps {
   className?: string;
 }
 
-export function CareerFormStep({
-  title,
-  description,
-  icon,
-  children,
-  className,
-}: CareerFormStepProps) {
-  return (
-    <Card className={cn("glass-card border-0 shadow-card animate-fade-in", className)}>
-      <CardHeader className="space-y-1">
-        <div className="flex items-center gap-3">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            {icon}
+export const CareerFormStep = forwardRef<HTMLDivElement, CareerFormStepProps>(
+  ({ title, description, icon, children, className }, ref) => {
+    return (
+      <Card ref={ref} className={cn("glass-card border-0 shadow-card animate-fade-in", className)}>
+        <CardHeader className="space-y-1">
+          <div className="flex items-center gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              {icon}
+            </div>
+            <div>
+              <CardTitle className="text-xl font-display">{title}</CardTitle>
+              <CardDescription>{description}</CardDescription>
+            </div>
           </div>
-          <div>
-            <CardTitle className="text-xl font-display">{title}</CardTitle>
-            <CardDescription>{description}</CardDescription>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">{children}</CardContent>
-    </Card>
-  );
-}
+        </CardHeader>
+        <CardContent className="space-y-6">{children}</CardContent>
+      </Card>
+    );
+  }
+);
+
+CareerFormStep.displayName = "CareerFormStep";
