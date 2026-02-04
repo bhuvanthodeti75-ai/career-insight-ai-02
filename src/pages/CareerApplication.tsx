@@ -89,47 +89,70 @@ export default function CareerApplication() {
   const checkExistingApplication = async () => {
     if (!user) return;
     setLoading(true);
-    
-    const { data, error } = await supabase
-      .from("career_applications")
-      .select("*")
-      .eq("user_id", user.id)
-      .single();
 
-    if (data && data.status !== "draft") {
-      setExistingApplication(true);
-      navigate("/dashboard");
-    } else if (data) {
-      // Load existing draft
-      setFormData({
-        full_name: data.full_name || "",
-        email: data.email || user?.email || "",
-        age: String(data.age) || "",
-        current_city: data.current_city || "",
-        highest_qualification: data.highest_qualification || "",
-        field_of_study: data.field_of_study || "",
-        current_status: data.current_status || "",
-        graduation_year: data.graduation_year || "",
-        technical_skills: data.technical_skills || [],
-        soft_skills: data.soft_skills || [],
-        tools_technologies: data.tools_technologies || [],
-        certifications: data.certifications || [],
-        subjects_enjoyed: data.subjects_enjoyed || [],
-        areas_of_interest: data.areas_of_interest || [],
-        work_preference: data.work_preference || "",
-        work_style: data.work_style || "",
-        strengths: data.strengths || [],
-        weaknesses: data.weaknesses || [],
-        work_environment: data.work_environment || "",
-        problem_solving_preference: data.problem_solving_preference || "",
-        long_term_goal: data.long_term_goal || "",
-        industries_of_interest: data.industries_of_interest || [],
-        willing_to_learn: data.willing_to_learn ?? true,
-        salary_expectation: data.salary_expectation || 5,
-        plan_duration_days: data.plan_duration_days || 30,
+    try {
+      // Use maybeSingle() so "no rows" doesn't throw and break the page.
+      const { data, error } = await supabase
+        .from("career_applications")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error checking existing application:", error);
+        toast({
+          variant: "destructive",
+          title: "Couldn't load your application",
+          description: "Please refresh the page and try again.",
+        });
+        return;
+      }
+
+      // Only redirect to dashboard when analysis is actually ready.
+      // If status is "submitted" (analysis failed/pending), keep user on /apply so they can retry.
+      if (data && data.status === "analyzed") {
+        setExistingApplication(true);
+        navigate("/dashboard");
+      } else if (data) {
+        // Load existing draft
+        setFormData({
+          full_name: data.full_name || "",
+          email: data.email || user?.email || "",
+          age: String(data.age) || "",
+          current_city: data.current_city || "",
+          highest_qualification: data.highest_qualification || "",
+          field_of_study: data.field_of_study || "",
+          current_status: data.current_status || "",
+          graduation_year: data.graduation_year || "",
+          technical_skills: data.technical_skills || [],
+          soft_skills: data.soft_skills || [],
+          tools_technologies: data.tools_technologies || [],
+          certifications: data.certifications || [],
+          subjects_enjoyed: data.subjects_enjoyed || [],
+          areas_of_interest: data.areas_of_interest || [],
+          work_preference: data.work_preference || "",
+          work_style: data.work_style || "",
+          strengths: data.strengths || [],
+          weaknesses: data.weaknesses || [],
+          work_environment: data.work_environment || "",
+          problem_solving_preference: data.problem_solving_preference || "",
+          long_term_goal: data.long_term_goal || "",
+          industries_of_interest: data.industries_of_interest || [],
+          willing_to_learn: data.willing_to_learn ?? true,
+          salary_expectation: data.salary_expectation || 5,
+          plan_duration_days: data.plan_duration_days || 30,
+        });
+      }
+    } catch (e) {
+      console.error("Unexpected error checking application:", e);
+      toast({
+        variant: "destructive",
+        title: "Something went wrong",
+        description: "Please refresh the page and try again.",
       });
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleFieldChange = (field: string, value: string | string[] | boolean | number) => {
