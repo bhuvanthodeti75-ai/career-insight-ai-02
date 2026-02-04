@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Sparkles, 
   Target, 
@@ -10,10 +11,13 @@ import {
   CheckCircle2,
   Users,
   TrendingUp,
-  Zap
+  Zap,
+  LayoutDashboard
 } from "lucide-react";
 
 export default function Index() {
+  const { user } = useAuth();
+
   const features = [
     {
       icon: <Sparkles className="h-6 w-6" />,
@@ -57,11 +61,22 @@ export default function Index() {
               </div>
               <span className="font-display font-bold text-xl">Career Mirror</span>
             </div>
-            <Link to="/auth">
-              <Button variant="outline" size="sm">
-                Sign In
-              </Button>
-            </Link>
+            <div className="flex items-center gap-2">
+              {user ? (
+                <Link to="/dashboard">
+                  <Button variant="default" size="sm">
+                    <LayoutDashboard className="h-4 w-4 mr-2" />
+                    Dashboard
+                  </Button>
+                </Link>
+              ) : (
+                <Link to="/auth">
+                  <Button variant="outline" size="sm">
+                    Sign In
+                  </Button>
+                </Link>
+              )}
+            </div>
           </header>
 
           {/* Hero Content */}
