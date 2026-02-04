@@ -64,7 +64,7 @@ serve(async (req) => {
    - Industry relevance and growth potential
    - A ranking from 1-10 based on: market demand, salary growth, career stability, and personal alignment
 
-4. A detailed day-by-day career growth plan for ${application.plan_duration_days} days, where each day includes:
+4. A day-by-day career growth plan for the FIRST 7 DAYS ONLY (to start with), where each day includes:
    - Day number
    - Skill or topic to focus on
    - A small actionable task
@@ -154,7 +154,7 @@ Provide your response in the following JSON format:
           { role: "user", content: userPrompt },
         ],
         temperature: 0.7,
-        max_tokens: 8000,
+        max_tokens: 16000,
       }),
     });
 
@@ -196,25 +196,48 @@ Provide your response in the following JSON format:
 
       // Step 2: Find JSON boundaries
       const jsonStart = cleaned.indexOf("{");
-      const jsonEnd = cleaned.lastIndexOf("}");
+      let jsonEnd = cleaned.lastIndexOf("}");
 
-      if (jsonStart === -1 || jsonEnd === -1) {
+      if (jsonStart === -1) {
         throw new Error("No JSON object found in response");
       }
 
-      cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+      // If no closing brace, try to repair truncated JSON
+      if (jsonEnd === -1 || jsonEnd < jsonStart) {
+        cleaned = cleaned.substring(jsonStart);
+        // Close any open arrays and objects
+        const openBrackets = (cleaned.match(/\[/g) || []).length;
+        const closeBrackets = (cleaned.match(/\]/g) || []).length;
+        const openBraces = (cleaned.match(/\{/g) || []).length;
+        const closeBraces = (cleaned.match(/\}/g) || []).length;
+        
+        // Remove trailing incomplete items
+        cleaned = cleaned.replace(/,\s*$/, "");
+        cleaned = cleaned.replace(/,\s*"[^"]*"?\s*$/, "");
+        cleaned = cleaned.replace(/,\s*\{[^}]*$/, "");
+        
+        // Close arrays and objects
+        for (let i = 0; i < openBrackets - closeBrackets; i++) cleaned += "]";
+        for (let i = 0; i < openBraces - closeBraces; i++) cleaned += "}";
+      } else {
+        cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+      }
 
-      // Step 3: Attempt parse with error handling
+      // Step 3: Clean common issues
+      cleaned = cleaned
+        .replace(/,\s*}/g, "}") // Remove trailing commas before }
+        .replace(/,\s*]/g, "]") // Remove trailing commas before ]
+        .replace(/[\x00-\x1F\x7F]/g, "") // Remove control characters
+        .replace(/\n/g, " ") // Replace newlines with spaces
+        .replace(/\r/g, ""); // Remove carriage returns
+
+      // Step 4: Attempt parse
       try {
         return JSON.parse(cleaned);
-      } catch {
-        // Step 4: Try to fix common issues
-        cleaned = cleaned
-          .replace(/,\s*}/g, "}") // Remove trailing commas before }
-          .replace(/,\s*]/g, "]") // Remove trailing commas before ]
-          .replace(/[\x00-\x1F\x7F]/g, ""); // Remove control characters
-
-        return JSON.parse(cleaned);
+      } catch (parseError) {
+        console.error("JSON parse error after cleaning:", parseError);
+        console.error("Cleaned content (first 500 chars):", cleaned.substring(0, 500));
+        throw new Error("Failed to parse AI response as JSON");
       }
     };
 
