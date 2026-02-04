@@ -249,7 +249,7 @@ Provide your response in the following JSON format:
   } catch (error) {
     console.error("Career analysis error:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error occurred" }),
+      JSON.stringify({ error: "Failed to process career analysis. Please try again." }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
