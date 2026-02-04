@@ -226,7 +226,7 @@ export default function CareerApplication() {
 
       if (appError) throw appError;
 
-      // Call OpenAI for career analysis
+      // Call AI for career analysis
       toast({
         title: "Analyzing your profile...",
         description: "This may take a minute. Our AI is crafting your personalized career insights.",
@@ -237,10 +237,24 @@ export default function CareerApplication() {
       });
 
       if (response.error) {
-        throw new Error(response.error.message);
+        // Handle specific error types
+        const errorMessage = response.error.message || "Unknown error";
+        
+        if (errorMessage.includes("Rate limit") || response.error.status === 429) {
+          throw new Error("Too many requests. Please wait a moment and try again.");
+        }
+        if (errorMessage.includes("credits") || response.error.status === 402) {
+          throw new Error("AI service temporarily unavailable. Please try again later.");
+        }
+        
+        throw new Error(errorMessage);
       }
 
+      // Validate the response has required data
       const analysis = response.data;
+      if (!analysis || !analysis.careerMirror || !analysis.careers) {
+        throw new Error("Invalid response from career analysis. Please try again.");
+      }
 
       // Update the application with AI results
       const { error: updateError } = await supabase
@@ -249,11 +263,14 @@ export default function CareerApplication() {
           status: "analyzed",
           career_mirror_summary: analysis.careerMirror,
           career_recommendations: analysis.careers,
-          daily_plan: analysis.dailyPlan,
+          daily_plan: analysis.dailyPlan || [],
         })
         .eq("user_id", user.id);
 
-      if (updateError) throw updateError;
+      if (updateError) {
+        console.error("Database update error:", updateError);
+        throw new Error("Failed to save your career analysis. Please try again.");
+      }
 
       toast({
         title: "Career Mirror Complete!",
@@ -263,10 +280,29 @@ export default function CareerApplication() {
       navigate("/dashboard");
     } catch (error) {
       console.error("Submission error:", error);
+      
+      // Provide clear, user-friendly error messages
+      let errorTitle = "Submission failed";
+      let errorDescription = "Something went wrong. Please try again.";
+      
+      if (error instanceof Error) {
+        errorDescription = error.message;
+        
+        // Categorize errors for better UX
+        if (error.message.includes("Rate limit") || error.message.includes("Too many")) {
+          errorTitle = "Please slow down";
+        } else if (error.message.includes("network") || error.message.includes("fetch")) {
+          errorTitle = "Connection error";
+          errorDescription = "Please check your internet connection and try again.";
+        } else if (error.message.includes("Invalid response")) {
+          errorTitle = "Analysis error";
+        }
+      }
+      
       toast({
         variant: "destructive",
-        title: "Submission failed",
-        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+        title: errorTitle,
+        description: errorDescription,
       });
     } finally {
       setSubmitting(false);

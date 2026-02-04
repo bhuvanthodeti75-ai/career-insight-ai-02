@@ -54,7 +54,23 @@ export default function Dashboard() {
         .eq("user_id", user.id)
         .single();
 
-      if (appError || !appData) {
+      if (appError) {
+        // Handle specific errors
+        if (appError.code === "PGRST116") {
+          // No rows found - redirect to apply
+          navigate("/apply");
+          return;
+        }
+        console.error("Application fetch error:", appError);
+        toast({
+          variant: "destructive",
+          title: "Error loading your data",
+          description: "Please try refreshing the page.",
+        });
+        return;
+      }
+
+      if (!appData) {
         navigate("/apply");
         return;
       }
@@ -67,15 +83,25 @@ export default function Dashboard() {
       setApplication(appData as unknown as CareerApplication);
 
       // Fetch progress
-      const { data: progressData } = await supabase
+      const { data: progressData, error: progressError } = await supabase
         .from("daily_progress")
         .select("*")
         .eq("application_id", appData.id)
         .order("day_number", { ascending: true });
 
+      if (progressError) {
+        console.error("Progress fetch error:", progressError);
+        // Non-critical - continue with empty progress
+      }
+
       setProgress((progressData || []) as unknown as DailyProgress[]);
     } catch (error) {
       console.error("Error fetching data:", error);
+      toast({
+        variant: "destructive",
+        title: "Something went wrong",
+        description: error instanceof Error ? error.message : "Please try refreshing the page.",
+      });
     } finally {
       setLoading(false);
     }
