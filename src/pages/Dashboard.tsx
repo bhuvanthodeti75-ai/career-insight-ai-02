@@ -23,7 +23,14 @@ import {
   CheckCircle2,
   Circle,
   Plus,
+  BarChart3,
 } from "lucide-react";
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
+import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell } from "recharts";
 import type { CareerApplication, CareerRecommendation, DailyPlanItem, DailyProgress } from "@/lib/supabase";
 
 export default function Dashboard() {
@@ -619,6 +626,79 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Performance Chart */}
+            <Card className="glass-card border-0 shadow-card">
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  <CardTitle className="font-display">Performance Overview</CardTitle>
+                </div>
+                <CardDescription>Your daily progress and completion status</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ChartContainer
+                  config={{
+                    completed: { label: "Completed", color: "hsl(var(--success))" },
+                    pending: { label: "Pending", color: "hsl(var(--muted))" },
+                  }}
+                  className="h-[250px] w-full"
+                >
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={dailyPlan.slice(0, Math.min(dailyPlan.length, 14)).map((day) => {
+                        const isCompleted = progress.some(
+                          (p) => p.day_number === day.day && p.completed
+                        );
+                        return {
+                          day: `Day ${day.day}`,
+                          value: isCompleted ? 1 : 0.3,
+                          status: isCompleted ? "completed" : "pending",
+                        };
+                      })}
+                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                    >
+                      <XAxis
+                        dataKey="day"
+                        tick={{ fontSize: 11 }}
+                        tickLine={false}
+                        axisLine={false}
+                      />
+                      <YAxis hide />
+                      <ChartTooltip
+                        content={
+                          <ChartTooltipContent
+                            formatter={(value, name, item) => (
+                              <span className="font-medium">
+                                {item.payload.status === "completed" ? "✓ Completed" : "○ Pending"}
+                              </span>
+                            )}
+                          />
+                        }
+                      />
+                      <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+                        {dailyPlan.slice(0, Math.min(dailyPlan.length, 14)).map((day, index) => {
+                          const isCompleted = progress.some(
+                            (p) => p.day_number === day.day && p.completed
+                          );
+                          return (
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={isCompleted ? "hsl(var(--success))" : "hsl(var(--muted))"}
+                            />
+                          );
+                        })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </ChartContainer>
+                {dailyPlan.length > 14 && (
+                  <p className="text-xs text-muted-foreground text-center mt-2">
+                    Showing first 14 days. Total: {dailyPlan.length} days.
+                  </p>
+                )}
+              </CardContent>
+            </Card>
 
             <Card className="glass-card border-0 shadow-card">
               <CardHeader>
