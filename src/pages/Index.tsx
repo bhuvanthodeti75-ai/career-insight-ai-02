@@ -95,7 +95,12 @@ export default function Index() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </Link>
-              <Button variant="outline" size="lg" className="w-full sm:w-auto text-lg px-8 h-14">
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="w-full sm:w-auto text-lg px-8 h-14"
+                onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
+              >
                 Learn More
               </Button>
             </div>
@@ -121,7 +126,7 @@ export default function Index() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-card">
+      <section id="features" className="py-20 bg-card">
         <div className="container px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-display font-bold text-foreground mb-4">
