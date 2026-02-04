@@ -19,24 +19,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    let isMounted = true;
+
+    // Safety net: never let the app hang indefinitely on auth loading.
+    const fallback = window.setTimeout(() => {
+      if (!isMounted) return;
+      console.warn("Auth loading fallback triggered (getSession/onAuthStateChange may have stalled)");
+      setLoading(false);
+    }, 4000);
+
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    try {
+      // Set up auth state listener FIRST
+      const sub = supabase.auth.onAuthStateChange((_event, nextSession) => {
+        if (!isMounted) return;
+        setSession(nextSession);
+        setUser(nextSession?.user ?? null);
         setLoading(false);
-      }
-    );
+      });
+      subscription = sub.data.subscription;
+    } catch (e) {
+      console.error("Failed to initialize auth state listener:", e);
+      setLoading(false);
+    }
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
-    });
+    supabase.auth
+      .getSession()
+      .then(({ data: { session: existingSession } }) => {
+        if (!isMounted) return;
+        setSession(existingSession);
+        setUser(existingSession?.user ?? null);
+        setLoading(false);
+      })
+      .catch((e) => {
+        console.error("Failed to get auth session:", e);
+        if (!isMounted) return;
+        setLoading(false);
+      });
 
     return () => {
-      subscription.unsubscribe();
+      isMounted = false;
+      window.clearTimeout(fallback);
+      subscription?.unsubscribe();
     };
   }, []);
 

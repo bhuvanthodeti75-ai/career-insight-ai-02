@@ -76,7 +76,16 @@ export default function Dashboard() {
       }
 
       if (appData.status !== "analyzed") {
-        navigate("/apply");
+        // Avoid redirect loops for "submitted" applications.
+        if (appData.status === "draft") {
+          navigate("/apply");
+          return;
+        }
+
+        // "submitted" means analysis hasn't completed (or failed previously).
+        // Show a clear state instead of bouncing between routes.
+        setApplication(appData as unknown as CareerApplication);
+        setProgress([]);
         return;
       }
 
@@ -173,11 +182,55 @@ export default function Dashboard() {
     return null;
   }
 
+  if (application.status !== "analyzed") {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-50">
+          <div className="container flex h-16 items-center justify-between px-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl mirror-gradient">
+                <Sparkles className="h-5 w-5 text-primary-foreground" />
+              </div>
+              <span className="font-display font-bold text-lg">Career Mirror</span>
+            </div>
+            <Button variant="ghost" size="sm" onClick={handleSignOut}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        </header>
+
+        <main className="container py-10 px-4">
+          <Card className="glass-card border-0 shadow-card max-w-2xl mx-auto">
+            <CardHeader>
+              <CardTitle className="font-display">Your analysis isn’t ready yet</CardTitle>
+              <CardDescription>
+                Your application is saved, but the career analysis hasn’t been generated.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Button className="w-full" onClick={() => navigate("/apply")}>
+                Go to application
+              </Button>
+              <Button
+                className="w-full"
+                variant="outline"
+                onClick={() => fetchData()}
+              >
+                Refresh status
+              </Button>
+            </CardContent>
+          </Card>
+        </main>
+      </div>
+    );
+  }
+
   const careers = (application.career_recommendations || []) as CareerRecommendation[];
   const dailyPlan = (application.daily_plan || []) as DailyPlanItem[];
   const completedDays = progress.filter((p) => p.completed).length;
-  const totalDays = application.plan_duration_days;
-  const progressPercent = (completedDays / totalDays) * 100;
+  const totalDays = application.plan_duration_days || 0;
+  const progressPercent = totalDays > 0 ? (completedDays / totalDays) * 100 : 0;
 
   const currentDayPlan = dailyPlan.find((d) => d.day === selectedDay);
   const currentDayProgress = progress.find((p) => p.day_number === selectedDay);
