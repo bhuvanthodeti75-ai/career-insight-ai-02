@@ -22,6 +22,7 @@ import {
   Clock,
   CheckCircle2,
   Circle,
+  Plus,
 } from "lucide-react";
 import type { CareerApplication, CareerRecommendation, DailyPlanItem, DailyProgress } from "@/lib/supabase";
 
@@ -35,6 +36,8 @@ export default function Dashboard() {
   const [selectedDay, setSelectedDay] = useState<number>(1);
   const [reflectionInput, setReflectionInput] = useState("");
   const [savingProgress, setSavingProgress] = useState(false);
+  const [activeTab, setActiveTab] = useState("mirror");
+  const [generatingMoreDays, setGeneratingMoreDays] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -170,6 +173,60 @@ export default function Dashboard() {
     navigate("/");
   };
 
+  const handleGenerateMoreDays = async () => {
+    if (!application || !user) return;
+    
+    const currentPlan = (application.daily_plan || []) as DailyPlanItem[];
+    const currentDays = currentPlan.length;
+    const targetDays = application.plan_duration_days || 30;
+    
+    if (currentDays >= targetDays) {
+      toast({
+        title: "Plan complete!",
+        description: "You've reached your target number of days.",
+      });
+      return;
+    }
+    
+    setGeneratingMoreDays(true);
+    
+    try {
+      const careers = (application.career_recommendations || []) as CareerRecommendation[];
+      const topCareer = careers[0]?.title || "your target career";
+      
+      const { data, error } = await supabase.functions.invoke("extend-daily-plan", {
+        body: {
+          applicationId: application.id,
+          currentDays,
+          targetDays,
+          context: {
+            fullName: application.full_name,
+            topCareer,
+            skills: application.technical_skills || [],
+          },
+        },
+      });
+      
+      if (error) throw error;
+      
+      toast({
+        title: "Plan extended!",
+        description: `Added ${data.newDays.length} more days to your plan.`,
+      });
+      
+      fetchData(); // Refresh data
+    } catch (error) {
+      console.error("Error generating more days:", error);
+      toast({
+        variant: "destructive",
+        title: "Error generating plan",
+        description: "Please try again in a moment.",
+      });
+    } finally {
+      setGeneratingMoreDays(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen hero-gradient flex items-center justify-center">
@@ -283,7 +340,7 @@ export default function Dashboard() {
         </Card>
 
         {/* Main Content Tabs */}
-        <Tabs defaultValue="mirror" className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="grid w-full grid-cols-4 h-12">
             <TabsTrigger value="mirror" className="gap-2">
               <Sparkles className="h-4 w-4" />
@@ -397,8 +454,37 @@ export default function Dashboard() {
 
           {/* Daily Plan Tab */}
           <TabsContent value="daily" className="space-y-4 animate-fade-in">
+            {/* Progress indicator for plan generation */}
+            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+              <div className="text-sm">
+                <span className="font-medium">{dailyPlan.length}</span>
+                <span className="text-muted-foreground"> of </span>
+                <span className="font-medium">{totalDays}</span>
+                <span className="text-muted-foreground"> days generated</span>
+              </div>
+              {dailyPlan.length < totalDays && (
+                <Button
+                  size="sm"
+                  onClick={handleGenerateMoreDays}
+                  disabled={generatingMoreDays}
+                >
+                  {generatingMoreDays ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Generate More Days
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
+
             <div className="flex gap-4 overflow-x-auto pb-4">
-              {dailyPlan.slice(0, 14).map((day) => {
+              {dailyPlan.map((day) => {
                 const isCompleted = progress.some(
                   (p) => p.day_number === day.day && p.completed
                 );
@@ -421,11 +507,6 @@ export default function Dashboard() {
                   </button>
                 );
               })}
-              {dailyPlan.length > 14 && (
-                <div className="flex-shrink-0 w-14 h-14 rounded-xl flex items-center justify-center bg-muted text-muted-foreground">
-                  +{dailyPlan.length - 14}
-                </div>
-              )}
             </div>
 
             {currentDayPlan && (
@@ -545,7 +626,7 @@ export default function Dashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
-                  {dailyPlan.slice(0, 30).map((day) => {
+                  {dailyPlan.map((day) => {
                     const dayProgress = progress.find((p) => p.day_number === day.day);
                     const isCompleted = dayProgress?.completed;
 
@@ -575,9 +656,7 @@ export default function Dashboard() {
                           size="sm"
                           onClick={() => {
                             setSelectedDay(day.day);
-                            document.querySelector('[data-value="daily"]')?.dispatchEvent(
-                              new MouseEvent('click', { bubbles: true })
-                            );
+                            setActiveTab("daily");
                           }}
                         >
                           View
