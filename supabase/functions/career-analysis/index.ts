@@ -186,16 +186,39 @@ Provide your response in the following JSON format:
       throw new Error("No content in AI response");
     }
 
-    // Parse the JSON from the response - handle markdown code blocks
-    let jsonContent = content;
-    
-    // Remove markdown code blocks if present
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
-    if (jsonMatch) {
-      jsonContent = jsonMatch[1].trim();
-    }
+    // Robust JSON extraction from LLM response
+    const extractJsonFromResponse = (response: string): unknown => {
+      // Step 1: Remove markdown code blocks
+      let cleaned = response
+        .replace(/```json\s*/gi, "")
+        .replace(/```\s*/g, "")
+        .trim();
 
-    const analysis = JSON.parse(jsonContent);
+      // Step 2: Find JSON boundaries
+      const jsonStart = cleaned.indexOf("{");
+      const jsonEnd = cleaned.lastIndexOf("}");
+
+      if (jsonStart === -1 || jsonEnd === -1) {
+        throw new Error("No JSON object found in response");
+      }
+
+      cleaned = cleaned.substring(jsonStart, jsonEnd + 1);
+
+      // Step 3: Attempt parse with error handling
+      try {
+        return JSON.parse(cleaned);
+      } catch {
+        // Step 4: Try to fix common issues
+        cleaned = cleaned
+          .replace(/,\s*}/g, "}") // Remove trailing commas before }
+          .replace(/,\s*]/g, "]") // Remove trailing commas before ]
+          .replace(/[\x00-\x1F\x7F]/g, ""); // Remove control characters
+
+        return JSON.parse(cleaned);
+      }
+    };
+
+    const analysis = extractJsonFromResponse(content);
 
     return new Response(JSON.stringify(analysis), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
