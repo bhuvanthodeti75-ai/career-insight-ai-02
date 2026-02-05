@@ -39,9 +39,9 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
+    const GOOGLE_API_KEY = Deno.env.get("GOOGLE_API_KEY");
+    if (!GOOGLE_API_KEY) {
+      throw new Error("GOOGLE_API_KEY is not configured");
     }
 
     const { application } = await req.json() as { application: CareerApplication };
@@ -141,20 +141,22 @@ Provide your response in the following JSON format:
   ]
 }`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GOOGLE_API_KEY}`, {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: `${systemPrompt}\n\n${userPrompt}` }]
+          }
         ],
-        temperature: 0.7,
-        max_tokens: 16000,
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 16000,
+        }
       }),
     });
 
@@ -180,7 +182,7 @@ Provide your response in the following JSON format:
     }
 
     const data = await response.json();
-    const content = data.choices[0]?.message?.content;
+    const content = data.candidates?.[0]?.content?.parts?.[0]?.text;
     
     if (!content) {
       throw new Error("No content in AI response");
