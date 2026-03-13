@@ -2,12 +2,22 @@ import React, { createContext, useContext, useEffect, useState } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+interface AuthActionResponse {
+  error: Error | null;
+}
+
+interface SignUpResponse extends AuthActionResponse {
+  emailAlreadyRegistered: boolean;
+  needsEmailVerification: boolean;
+}
+
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   loading: boolean;
-  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null }>;
-  signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<SignUpResponse>;
+  signIn: (email: string, password: string) => Promise<AuthActionResponse>;
+  resendVerification: (email: string) => Promise<AuthActionResponse>;
   signOut: () => Promise<void>;
 }
 
@@ -66,8 +76,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
-  const signUp = async (email: string, password: string, fullName: string) => {
-    const { error } = await supabase.auth.signUp({
+  const signUp = async (email: string, password: string, fullName: string): Promise<SignUpResponse> => {
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -77,7 +87,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         },
       },
     });
-    return { error: error as Error | null };
+
+    if (error) {
+      return {
+        error: error as Error,
+        emailAlreadyRegistered: false,
+        needsEmailVerification: false,
+      };
+    }
+
+    const emailAlreadyRegistered = (data.user?.identities?.length ?? 0) === 0;
+    const needsEmailVerification = !data.session && !emailAlreadyRegistered;
+
+    return {
+      error: null,
+      emailAlreadyRegistered,
+      needsEmailVerification,
+    };
   };
 
   const signIn = async (email: string, password: string) => {
@@ -88,12 +114,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { error: error as Error | null };
   };
 
+  const resendVerification = async (email: string) => {
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: {
+        emailRedirectTo: window.location.origin,
+      },
+    });
+
+    return { error: error as Error | null };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, session, loading, signUp, signIn, resendVerification, signOut }}>
       {children}
     </AuthContext.Provider>
   );
