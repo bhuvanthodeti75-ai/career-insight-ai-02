@@ -10,20 +10,23 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Sparkles } from "lucide-react";
 
 export default function Auth() {
-  const { signIn, signUp } = useAuth();
+  const { signIn, signUp, resendVerification } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
-  
+  const [resendLoading, setResendLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
+  const [pendingVerificationEmail, setPendingVerificationEmail] = useState("");
+
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [signupData, setSignupData] = useState({ email: "", password: "", fullName: "" });
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    const { error } = await signIn(loginData.email, loginData.password);
-    
+
+    const { error } = await signIn(loginData.email.trim(), loginData.password);
+
     if (error) {
       toast({
         variant: "destructive",
@@ -39,22 +42,61 @@ export default function Auth() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    
-    const { error } = await signUp(signupData.email, signupData.password, signupData.fullName);
-    
+
+    const email = signupData.email.trim();
+    const fullName = signupData.fullName.trim();
+    const { error, emailAlreadyRegistered, needsEmailVerification } = await signUp(
+      email,
+      signupData.password,
+      fullName
+    );
+
     if (error) {
       toast({
         variant: "destructive",
         title: "Signup failed",
         description: error.message,
       });
-    } else {
+    } else if (emailAlreadyRegistered) {
+      setPendingVerificationEmail("");
+      setActiveTab("login");
+      toast({
+        title: "Account already exists",
+        description: "This email is already registered. Please sign in.",
+      });
+    } else if (needsEmailVerification) {
+      setPendingVerificationEmail(email);
       toast({
         title: "Check your email",
         description: "We've sent you a verification link. Please verify your email to continue.",
       });
+    } else {
+      navigate("/dashboard");
     }
+
     setLoading(false);
+  };
+
+  const handleResendVerification = async () => {
+    if (!pendingVerificationEmail) return;
+    setResendLoading(true);
+
+    const { error } = await resendVerification(pendingVerificationEmail);
+
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Could not resend email",
+        description: error.message,
+      });
+    } else {
+      toast({
+        title: "Verification email sent",
+        description: `A new verification link was sent to ${pendingVerificationEmail}.`,
+      });
+    }
+
+    setResendLoading(false);
   };
 
   return (
@@ -76,12 +118,12 @@ export default function Auth() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="login" className="w-full">
+            <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "login" | "signup")} className="w-full">
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="login">Sign In</TabsTrigger>
                 <TabsTrigger value="signup">Sign Up</TabsTrigger>
               </TabsList>
-              
+
               <TabsContent value="login">
                 <form onSubmit={handleLogin} className="space-y-4">
                   <div className="space-y-2">
@@ -118,7 +160,7 @@ export default function Auth() {
                   </Button>
                 </form>
               </TabsContent>
-              
+
               <TabsContent value="signup">
                 <form onSubmit={handleSignup} className="space-y-4">
                   <div className="space-y-2">
@@ -155,7 +197,7 @@ export default function Auth() {
                       minLength={6}
                     />
                   </div>
-                  <Button type="submit" className="w-full" disabled={loading}>
+                  <Button type="submit" className="w-full" disabled={loading || resendLoading}>
                     {loading ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -165,6 +207,25 @@ export default function Auth() {
                       "Create Account"
                     )}
                   </Button>
+
+                  {pendingVerificationEmail && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={handleResendVerification}
+                      disabled={loading || resendLoading}
+                    >
+                      {resendLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Sending verification...
+                        </>
+                      ) : (
+                        "Resend verification email"
+                      )}
+                    </Button>
+                  )}
                 </form>
               </TabsContent>
             </Tabs>
